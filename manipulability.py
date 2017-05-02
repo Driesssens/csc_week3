@@ -5,14 +5,17 @@ from datetime import datetime
 
 
 def generate_ballot(n_alternatives):
+    """Generates a random ballot with `n_alternatives`."""
     return random.sample(list(range(n_alternatives)), n_alternatives)
 
 
 def generate_profile(n_alternatives, n_voters):
+    """Generates a random profile for `n_voters` and `n_alternatives`."""
     return [generate_ballot(n_alternatives) for voter in range(n_voters)]
 
 
 def plurality_scores(profile):
+    """Given `profile`, calculates each alternative's score under the plurality rule."""
     scores = defaultdict(int)
 
     for ballot in profile:
@@ -22,40 +25,44 @@ def plurality_scores(profile):
 
 
 def borda_scores(profile):
+    """Given `profile`, calculates each alternative's score under the Borda rule."""
     scores = defaultdict(int)
 
     for ballot in profile:
         for i in range(len(ballot)):
             position = i + 1
-            scores[ballot[i]] += len(ballot) - position
+            scores[ballot[i]] += len(ballot) - position  # Increase score according to Borda count
 
     return scores
 
 
 def copeland_scores(profile):
+    """Given `profile`, calculates each alternative's score under the Copeland rule."""
     n_alternatives = len(profile[0])
     table = defaultdict(lambda: defaultdict(int))
 
-    for ballot in profile:
+    for ballot in profile:  # First, loop through ballots to count how often an alternative ranks higher than another.
         for i_top_alternative in range(n_alternatives):
             for i_bottom_alternative in range(i_top_alternative, n_alternatives):
                 table[ballot[i_top_alternative]][ballot[i_bottom_alternative]] += 1
 
     scores = defaultdict(int)
 
-    for i_alternative in range(n_alternatives):
+    for i_alternative in range(n_alternatives):  # Then, do the pairwise majority contests.
         for j_alternative in range(i_alternative, n_alternatives):
             balance = 0
-            balance += table[i_alternative][j_alternative]
-            balance -= table[j_alternative][i_alternative]
+            balance += table[i_alternative][j_alternative]  # Add amount of ballots in which i > j
+            balance -= table[j_alternative][i_alternative]  # Subtract amount of ballots in which j > i
 
-            if balance == 0:
+            if balance == 0:  # It's a tie
                 scores[i_alternative] += 0
                 scores[j_alternative] += 0
-            elif balance > 0:
+
+            elif balance > 0:  # Alternative i won the majority contest
                 scores[i_alternative] += 1
                 scores[j_alternative] -= 1
-            else:
+
+            else:  # Alternative j won the majority contest
                 scores[i_alternative] -= 1
                 scores[j_alternative] += 1
 
@@ -63,16 +70,16 @@ def copeland_scores(profile):
 
 
 def winners(scoring_rule, profile):
+    """Given `profile`, determine the set of winners under `scoring_rule`."""
+
     scores = scoring_rule(profile)
     top_score = max(scores.values())
     return [alternative for alternative, score in scores.items() if score == top_score]
 
 
-def manipulability(scoring_rule, incomplete_profile, favourite_alternative):
-    return search_manipulative_ballot(scoring_rule, incomplete_profile, favourite_alternative) is not None
-
-
 def search_manipulative_ballot(rule, incomplete_profile, favourite_alternative):
+    """The MANIPULABILITY decision problem algorithm, except that it also returns the ballot if there is one."""
+
     manipulative_ballot = [favourite_alternative]
     other_alternatives = list(range(len(incomplete_profile[0])))
     other_alternatives.remove(favourite_alternative)
@@ -118,10 +125,9 @@ def search_manipulative_ballot(rule, incomplete_profile, favourite_alternative):
 
 
 class Experiment:
-    results_folder = "results"
-
-    def __init__(self, results_file_name=None, debug=False):
+    def __init__(self, results_folder="results", results_file_name=None, debug=False):
         self.debug = debug
+        self.results_folder = results_folder
 
         if results_file_name:
             self.results_file_name = results_file_name
@@ -129,39 +135,51 @@ class Experiment:
             self.results_file_name = datetime.now
 
     def manipulable(self, scoring_rule, profile):
+        """Returns whether `profile` is manipulable under `scoring_rule`."""
 
-        truthful_winners = winners(scoring_rule, profile)
+        truthful_winners = winners(scoring_rule, profile)  # Compute set of winners
 
         if self.debug:
             print("Checking the following profile with winners {0}: {1}".format(truthful_winners, profile))
 
-        for i_voter in range(len(profile)):
-            truthful_ballot = profile[i_voter]
-            for alternative in truthful_ballot:
+        for i_voter in range(len(profile)):  # For every voter...
+            truthful_ballot = profile[i_voter]  # Look up his ballot
+            for alternative in truthful_ballot:  # Iterate trough the alternatives from top-ranked to bottom-ranked
+
                 if alternative in truthful_winners:
+                    # The alternative is already in the set of winners for this profile. Either this is the top-ranked
+                    # alternative, or the previous alternatives could not be manipulated into the set of winners. Either
+                    # way, we can conclude that this profile has no incentive to manipulate for optimistic voters.
                     if self.debug:
                         print("   As alternative {0} is in set of winners, voter {1} with ballot {2} can not manipulate.".format(alternative, i_voter, truthful_ballot))
                         break
                 else:
+                    # Remove this voter's ballot from the profile
                     incomplete_profile = profile[:]
                     incomplete_profile.remove(truthful_ballot)
+
+                    # Use the MANIPULABILITY algorithm to check if we can construct a ballot that manipulates `alternative` into the set of winners
                     manipulative_ballot = search_manipulative_ballot(scoring_rule, incomplete_profile, alternative)
 
                     if manipulative_ballot:
+                        # Such a ballot exists. That means this profile is manipulable.
                         if self.debug:
                             print("   Voter {0} can elect {1} by changing {2} to {3}.".format(i_voter, alternative, truthful_ballot, manipulative_ballot))
                         return True
 
                     else:
+                        # Such a ballot does not exist. Move to the next alternative.
                         if self.debug:
                             print("   Voter {0} with ballot {1} can't manipulate to elect {2}.".format(i_voter, truthful_ballot, alternative))
 
     def experiment(self, scoring_rule, n_alternatives, n_voters, n_samples):
+        """Checks `n_samples` random profiles with `n_alternatives` and `n_voters` for manipulability."""
+
         n_manipulable = 0
         n_nonmanipulable = 0
 
         for i_sample in range(n_samples):
-            sample_profile = generate_profile(n_alternatives, n_voters)
+            sample_profile = generate_profile(n_alternatives, n_voters)  # Generate random sample profile
             if self.manipulable(scoring_rule, sample_profile):
                 n_manipulable += 1
             else:
@@ -198,6 +216,20 @@ def test():
     exp.experiment(plurality_scores, 10, 5, 100)
     exp.experiment(plurality_scores, 10, 10, 100)
     exp.experiment(plurality_scores, 10, 15, 100)
+
+    exp.experiment(borda_scores, 4, 4, 100)
+    exp.experiment(borda_scores, 5, 5, 100)
+    exp.experiment(borda_scores, 5, 10, 100)
+    exp.experiment(borda_scores, 10, 5, 100)
+    exp.experiment(borda_scores, 10, 10, 100)
+    exp.experiment(borda_scores, 10, 15, 100)
+
+    exp.experiment(copeland_scores, 4, 4, 100)
+    exp.experiment(copeland_scores, 5, 5, 100)
+    exp.experiment(copeland_scores, 5, 10, 100)
+    exp.experiment(copeland_scores, 10, 5, 100)
+    exp.experiment(copeland_scores, 10, 10, 100)
+    exp.experiment(copeland_scores, 10, 15, 100)
 
 
 test()
