@@ -1,6 +1,7 @@
 import random
 from collections import defaultdict
 import os
+import timeit
 from datetime import datetime
 
 
@@ -125,14 +126,10 @@ def search_manipulative_ballot(rule, incomplete_profile, favourite_alternative):
 
 
 class Experiment:
-    def __init__(self, results_folder="results", results_file_name=None, debug=False):
+    def __init__(self, results_file_name, results_folder="results", debug=False):
         self.debug = debug
         self.results_folder = results_folder
-
-        if results_file_name:
-            self.results_file_name = results_file_name
-        else:
-            self.results_file_name = datetime.now
+        self.results_file_name = results_file_name
 
     def manipulable(self, scoring_rule, profile):
         """Returns whether `profile` is manipulable under `scoring_rule`."""
@@ -209,27 +206,27 @@ def test_one_manipulation():
 
 
 def test():
-    exp = Experiment("first_test")
-    exp.experiment(plurality_scores, 4, 4, 100)
-    exp.experiment(plurality_scores, 5, 5, 100)
-    exp.experiment(plurality_scores, 5, 10, 100)
-    exp.experiment(plurality_scores, 10, 5, 100)
-    exp.experiment(plurality_scores, 10, 10, 100)
-    exp.experiment(plurality_scores, 10, 15, 100)
-
-    exp.experiment(borda_scores, 4, 4, 100)
-    exp.experiment(borda_scores, 5, 5, 100)
-    exp.experiment(borda_scores, 5, 10, 100)
-    exp.experiment(borda_scores, 10, 5, 100)
-    exp.experiment(borda_scores, 10, 10, 100)
-    exp.experiment(borda_scores, 10, 15, 100)
+    exp = Experiment("speed_test")
+    # exp.experiment(plurality_scores, 4, 4, 100)
+    # exp.experiment(plurality_scores, 5, 5, 100)
+    # exp.experiment(plurality_scores, 5, 10, 100)
+    # exp.experiment(plurality_scores, 10, 5, 100)
+    # exp.experiment(plurality_scores, 10, 10, 100)
+    # exp.experiment(plurality_scores, 10, 15, 100)
+    #
+    # exp.experiment(borda_scores, 4, 4, 100)
+    # exp.experiment(borda_scores, 5, 5, 100)
+    # exp.experiment(borda_scores, 5, 10, 100)
+    # exp.experiment(borda_scores, 10, 5, 100)
+    # exp.experiment(borda_scores, 10, 10, 100)
+    # exp.experiment(borda_scores, 10, 15, 100)
 
     exp.experiment(copeland_scores, 4, 4, 100)
     exp.experiment(copeland_scores, 5, 5, 100)
     exp.experiment(copeland_scores, 5, 10, 100)
     exp.experiment(copeland_scores, 10, 5, 100)
     exp.experiment(copeland_scores, 10, 10, 100)
-    exp.experiment(copeland_scores, 10, 15, 100)
+    exp.experiment(copeland_scores, 10, 15, 2000)
 
 
 test()
